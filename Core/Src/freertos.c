@@ -93,7 +93,8 @@ const osMutexAttr_t ButtonMutex_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-
+void LED2_Blink(void);
+void LED2_SOS(void);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -175,8 +176,8 @@ void StartDefaultTask(void *argument)
   for(;;)
   {
     osDelay(200);
-    HAL_UART_Transmit(&huart2, (uint8_t *)"Default Task\r\n", sizeof("Default Task\r\n")-1, HAL_MAX_DELAY);
   }
+    //HAL_UART_Transmit(&huart2, (uint8_t *)"Default Task\r\n", sizeof("Default Task\r\n")-1, HAL_MAX_DELAY);
   /* USER CODE END StartDefaultTask */
 }
 
@@ -193,8 +194,9 @@ void StartLedBlinkTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(500);
-    HAL_GPIO_TogglePin(LED2_GPIO_PORT, LED2_PIN);
+    
+    LED2_Blink();
+    //LED2_SOS();
   }
   /* USER CODE END StartLedBlinkTask */
 }
@@ -210,15 +212,76 @@ void StartButtonTask(void *argument)
 {
   /* USER CODE BEGIN StartButtonTask */
   /* Infinite loop */
+  GPIO_PinState buttonState;
   for(;;)
   {
-    osDelay(1);
+    
+    uint8_t DebounceCounter = 0;
+    
+    while(DebounceCounter < 5) {
+      while(osMutexAcquire(ButtonMutexHandle, osWaitForever) != osOK);
+      buttonState = HAL_GPIO_ReadPin(USER_BUTTON_GPIO_PORT, USER_BUTTON_PIN);
+      osMutexRelease(ButtonMutexHandle);
+      
+      if(buttonState == GPIO_PIN_RESET) {
+        DebounceCounter++;
+      } else {
+        DebounceCounter = 0;
+      }
+      osDelay(10); // Debounce delay
+    }
+    
+    // Button is pressed
+    osMutexAcquire(UARTMutexHandle, osWaitForever);
+    HAL_UART_Transmit(&huart2, (uint8_t *)"SOS\r\n", sizeof("SOS\r\n")-1, HAL_MAX_DELAY);
+    osMutexRelease(UARTMutexHandle);
+    osDelay(100);
+
+    while(buttonState == GPIO_PIN_RESET) {
+      while(osMutexAcquire(ButtonMutexHandle, osWaitForever) != osOK);
+      buttonState = HAL_GPIO_ReadPin(USER_BUTTON_GPIO_PORT, USER_BUTTON_PIN);
+      osMutexRelease(ButtonMutexHandle);
+      osDelay(10); // Debounce delay
+    }
   }
   /* USER CODE END StartButtonTask */
 }
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+void LED2_Blink(void)
+{
+  osDelay(1000);
+  while(osMutexAcquire(LED2MutexHandle, osWaitForever) != osOK);
+  HAL_GPIO_TogglePin(LED2_GPIO_PORT, LED2_PIN);
+  osMutexRelease(LED2MutexHandle);
+}
+
+void LED2_SOS(void)
+{
+  while(osMutexAcquire(LED2MutexHandle, osWaitForever) != osOK);
+  HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_RESET);
+  osDelay(500); // Initial delay before starting SOS pattern
+  // SOS in Morse code: ... --- ...
+  for (int i = 0; i < 6; i++) {
+    HAL_GPIO_TogglePin(LED2_GPIO_PORT, LED2_PIN);
+    osDelay(200); // Short blink
+  }
+  osDelay(600); // Pause between letters
+  for (int i = 0; i < 3; i++) {
+    HAL_GPIO_TogglePin(LED2_GPIO_PORT, LED2_PIN);
+    osDelay(600); // Long blink
+    HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, GPIO_PIN_RESET);
+    osDelay(200); // Short pause
+  }
+  osDelay(600); // Pause between letters
+  for (int i = 0; i < 6; i++) {
+    HAL_GPIO_TogglePin(LED2_GPIO_PORT, LED2_PIN);
+    osDelay(200); // Short blink
+  }
+  osDelay(1000); // Pause before repeating
+  osMutexRelease(LED2MutexHandle);
+}
 
 /* USER CODE END Application */
 
