@@ -28,6 +28,7 @@
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_hal_gpio.h"
 #include "usart.h"
+#include "stdbool.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -93,7 +94,7 @@ const osMutexAttr_t ButtonMutex_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-void LED2_Blink(void);
+void LED2_Blink(uint16_t rate);
 void LED2_SOS(void);
 /* USER CODE END FunctionPrototypes */
 
@@ -136,7 +137,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of ComQueue */
-  ComQueueHandle = osMessageQueueNew (16, sizeof(uint16_t), &ComQueue_attributes);
+  ComQueueHandle = osMessageQueueNew (16, sizeof(uint8_t), &ComQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -192,10 +193,26 @@ void StartLedBlinkTask(void *argument)
 {
   /* USER CODE BEGIN StartLedBlinkTask */
   /* Infinite loop */
+  bool blinkRate = true; // Default blink rate
+  uint8_t queuemsg;
   for(;;)
-  {
+  {   
+    osMessageQueueGet(ComQueueHandle, &queuemsg, 0, 100);
+    if (queuemsg == 0xFF) 
+    {
+      while(osMutexAcquire(UARTMutexHandle, osWaitForever) != osOK);
+      HAL_UART_Transmit(&huart2, (uint8_t *)"MSG received\r\n", sizeof("MSG received\r\n")-1, HAL_MAX_DELAY);
+      osMutexRelease(UARTMutexHandle);
+      blinkRate = !blinkRate; // Change blink rate to fast when SOS is received
+      queuemsg = 0; // Reset the message after processing
+    }
+
+    if (blinkRate) {
+      LED2_Blink(1000); // Slow blink
+    } else {
+      LED2_Blink(200); // Fast blink
+    }
     
-    LED2_Blink();
     //LED2_SOS();
   }
   /* USER CODE END StartLedBlinkTask */
@@ -230,11 +247,13 @@ void StartButtonTask(void *argument)
       }
       osDelay(10); // Debounce delay
     }
-    
+
     // Button is pressed
-    osMutexAcquire(UARTMutexHandle, osWaitForever);
-    HAL_UART_Transmit(&huart2, (uint8_t *)"SOS\r\n", sizeof("SOS\r\n")-1, HAL_MAX_DELAY);
-    osMutexRelease(UARTMutexHandle);
+    // osMutexAcquire(UARTMutexHandle, osWaitForever);
+    // HAL_UART_Transmit(&huart2, (uint8_t *)"SOS\r\n", sizeof("SOS\r\n")-1, HAL_MAX_DELAY);
+    // osMutexRelease(UARTMutexHandle);
+    uint8_t message = 0xFF;
+    osMessageQueuePut(ComQueueHandle, &message, 0, osWaitForever);
     osDelay(100);
 
     while(buttonState == GPIO_PIN_RESET) {
@@ -249,9 +268,10 @@ void StartButtonTask(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-void LED2_Blink(void)
+void LED2_Blink(uint16_t rate)
 {
-  osDelay(1000);
+
+  osDelay(rate);
   while(osMutexAcquire(LED2MutexHandle, osWaitForever) != osOK);
   HAL_GPIO_TogglePin(LED2_GPIO_PORT, LED2_PIN);
   osMutexRelease(LED2MutexHandle);
