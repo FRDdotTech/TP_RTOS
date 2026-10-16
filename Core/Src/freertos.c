@@ -25,10 +25,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "stm32f4xx_hal.h"
+#include "stm32f4xx_hal.h"  // this include must be compiled ASAP to defined the struct HAL_StatusTypeDef
 #include "stm32f4xx_hal_gpio.h"
 #include "usart.h"
 #include "stdbool.h"
+#include "tim.h"
+#include <stdio.h>
+#include <string.h>
+#include "adc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -71,6 +75,27 @@ const osThreadAttr_t ButtonTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
+/* Definitions for StepResponse */
+osThreadId_t StepResponseHandle;
+const osThreadAttr_t StepResponse_attributes = {
+  .name = "StepResponse",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityRealtime,
+};
+/* Definitions for PWMResponse */
+osThreadId_t PWMResponseHandle;
+const osThreadAttr_t PWMResponse_attributes = {
+  .name = "PWMResponse",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityRealtime,
+};
+/* Definitions for Scheduler */
+osThreadId_t SchedulerHandle;
+const osThreadAttr_t Scheduler_attributes = {
+  .name = "Scheduler",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityLow,
+};
 /* Definitions for ComQueue */
 osMessageQueueId_t ComQueueHandle;
 const osMessageQueueAttr_t ComQueue_attributes = {
@@ -101,6 +126,9 @@ void LED2_SOS(void);
 void StartDefaultTask(void *argument);
 void StartLedBlinkTask(void *argument);
 void StartButtonTask(void *argument);
+void StartStepResponse(void *argument);
+void StartPWMResponse(void *argument);
+void StartScheduler(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -152,6 +180,15 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of ButtonTask */
   ButtonTaskHandle = osThreadNew(StartButtonTask, NULL, &ButtonTask_attributes);
+
+  /* creation of StepResponse */
+  StepResponseHandle = osThreadNew(StartStepResponse, NULL, &StepResponse_attributes);
+
+  /* creation of PWMResponse */
+  PWMResponseHandle = osThreadNew(StartPWMResponse, NULL, &PWMResponse_attributes);
+
+  /* creation of Scheduler */
+  SchedulerHandle = osThreadNew(StartScheduler, NULL, &Scheduler_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -264,6 +301,75 @@ void StartButtonTask(void *argument)
     }
   }
   /* USER CODE END StartButtonTask */
+}
+
+/* USER CODE BEGIN Header_StartStepResponse */
+/**
+* @brief Function implementing the StepResponse thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartStepResponse */
+void StartStepResponse(void *argument)
+{
+  /* USER CODE BEGIN StartStepResponse */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartStepResponse */
+}
+
+/* USER CODE BEGIN Header_StartPWMResponse */
+/**
+* @brief Function implementing the PWMResponse thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartPWMResponse */
+void StartPWMResponse(void *argument)
+{
+  /* USER CODE BEGIN StartPWMResponse */
+  /* Infinite loop */
+  uint16_t   pwm_cmd = 0;
+  uint32_t  raw_responce = 0;
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  char cmd_msg[] = "duty cycle = 000 -- ";
+  char res_msg[] = "raw response = 00000\r\n";
+  HAL_ADC_Start(&hadc1);
+  for (size_t i = 0; i < 101; i++)
+  {
+    pwm_cmd = i*10;
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pwm_cmd);
+    osDelay(1000);
+    raw_responce = HAL_ADC_GetValue(&hadc1);
+    sprintf(cmd_msg, "duty cycle = %03d -- ", i);
+    sprintf(res_msg, "raw response = %05d\r\n", (int)raw_responce);
+    HAL_UART_Transmit(&huart2, (uint8_t *)cmd_msg, sizeof(cmd_msg)-1, HAL_MAX_DELAY);
+    HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
+  }
+  HAL_ADC_Stop(&hadc1);
+  
+  /* USER CODE END StartPWMResponse */
+}
+
+/* USER CODE BEGIN Header_StartScheduler */
+/**
+* @brief Function implementing the Scheduler thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartScheduler */
+void StartScheduler(void *argument)
+{
+  /* USER CODE BEGIN StartScheduler */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartScheduler */
 }
 
 /* Private application code --------------------------------------------------*/
