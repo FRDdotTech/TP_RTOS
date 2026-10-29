@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "adc.h"
+#include "rtc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -314,10 +315,37 @@ void StartStepResponse(void *argument)
 {
   /* USER CODE BEGIN StartStepResponse */
   /* Infinite loop */
-  for(;;)
+
+  RTC_TimeTypeDef internal_time;
+  uint32_t  raw_responce = 0;
+  uint32_t response_array[1000];
+  uint32_t time_array[1000];
+  HAL_ADC_Start_DMA(&hadc1,(uint32_t*)&raw_responce,1); 
+  HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
+  char cmd_msg[] = "step responce 0-20 duty-cycle\r\n";
+  char res_msg[] = "raw response = 00000\r\n";
+  char timestamp_msg[] = "000000";
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
+  HAL_UART_Transmit(&huart2, (uint8_t *)cmd_msg, sizeof(cmd_msg)-1, HAL_MAX_DELAY);
+  sprintf(res_msg, "raw response = %05d\r\n", (int)raw_responce);
+  HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 200);
+  for (size_t i = 0; i < 1000; i++)
   {
-    osDelay(1);
+    HAL_RTC_GetTime(&hrtc, &internal_time, RTC_FORMAT_BCD);
+    response_array[i] = raw_responce;
+    time_array[i] = internal_time.SecondFraction;
   }
+  for (size_t i = 0; i < 1000; i++)
+  {
+    sprintf(timestamp_msg, "%06d", (int) time_array[i]);
+    HAL_UART_Transmit(&huart2, (uint8_t *)timestamp_msg, sizeof(timestamp_msg)-1, HAL_MAX_DELAY);
+    sprintf(res_msg, "raw response = %05d\r\n", (int)response_array[i]);
+    HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
+  }
+  
+  
+  
   /* USER CODE END StartStepResponse */
 }
 
@@ -334,22 +362,20 @@ void StartPWMResponse(void *argument)
   /* Infinite loop */
   uint16_t   pwm_cmd = 0;
   uint32_t  raw_responce = 0;
+  HAL_ADC_Start_DMA(&hadc1,(uint32_t*)&raw_responce,1); 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   char cmd_msg[] = "duty cycle = 000 -- ";
   char res_msg[] = "raw response = 00000\r\n";
-  HAL_ADC_Start(&hadc1);
-  for (size_t i = 0; i < 101; i++)
+  for (size_t i = 0; i < 80; i++)
   {
     pwm_cmd = i*10;
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pwm_cmd);
     osDelay(1000);
-    raw_responce = HAL_ADC_GetValue(&hadc1);
     sprintf(cmd_msg, "duty cycle = %03d -- ", i);
     sprintf(res_msg, "raw response = %05d\r\n", (int)raw_responce);
     HAL_UART_Transmit(&huart2, (uint8_t *)cmd_msg, sizeof(cmd_msg)-1, HAL_MAX_DELAY);
     HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
   }
-  HAL_ADC_Stop(&hadc1);
   
   /* USER CODE END StartPWMResponse */
 }

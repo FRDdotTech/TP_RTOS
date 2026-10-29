@@ -1,0 +1,10 @@
+angle(°),varistor_1(ohm), varistor_2(ohm)
+0,780,
+resting,1090
+100,1944
+
+raw response
+
+0, 595
+resting, 790
+100, 1230
