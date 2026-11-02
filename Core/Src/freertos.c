@@ -207,7 +207,6 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
   PWMResponseHandle = osThreadNew(StartPWMResponse, NULL, &PWMResponse_attributes);
-    //HAL_UART_Transmit(&huart2, (uint8_t *)"Default Task\r\n", sizeof("Default Task\r\n")-1, HAL_MAX_DELAY);
   /* USER CODE END StartDefaultTask */
 }
 
@@ -313,15 +312,15 @@ void StartStepResponse(void *argument)
   uint32_t time_array[1000];
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   char cmd_msg[] = "step responce 0-20 duty-cycle\r\n";
-  char res_msg[] = "raw response = 00000\r\n";
-  char timestamp_msg[] = "000000";
+  char res_msg[] = " raw response, 00000\r\n";
+  char timestamp_msg[] = "000000 ,";
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
   HAL_UART_Transmit(&huart2, (uint8_t *)cmd_msg, sizeof(cmd_msg)-1, HAL_MAX_DELAY);
   HAL_ADC_Start(&hadc1);
   HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
   raw_responce = HAL_ADC_GetValue(&hadc1);
   HAL_ADC_Stop(&hadc1);
-  sprintf(res_msg, "raw response = %05d\r\n", (int)raw_responce);
+  sprintf(res_msg, " raw response, %05d\r\n", (int)raw_responce);
   HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 20); // 20%
   for (size_t i = 0; i < 1000; i++)
@@ -338,7 +337,7 @@ void StartStepResponse(void *argument)
   {
     sprintf(timestamp_msg, "%06d", (int) time_array[i]);
     HAL_UART_Transmit(&huart2, (uint8_t *)timestamp_msg, sizeof(timestamp_msg)-1, HAL_MAX_DELAY);
-    sprintf(res_msg, "raw response = %05d\r\n", (int)response_array[i]);
+    sprintf(res_msg, " raw response, %05d\r\n", (int)response_array[i]);
     HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
   }
   
