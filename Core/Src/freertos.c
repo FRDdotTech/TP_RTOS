@@ -323,7 +323,7 @@ void StartStepResponse(void *argument)
   HAL_ADC_Stop(&hadc1);
   sprintf(res_msg, "raw response = %05d\r\n", (int)raw_responce);
   HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 200);
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 20); // 20%
   for (size_t i = 0; i < 1000; i++)
   {
     HAL_RTC_GetTime(&hrtc, &internal_time, RTC_FORMAT_BCD);
@@ -358,15 +358,15 @@ void StartPWMResponse(void *argument)
 {
   /* USER CODE BEGIN StartPWMResponse */
   /* Infinite loop */
-  uint16_t   pwm_cmd = 0;
   uint32_t  raw_responce = 0;
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   char cmd_msg[] = "duty cycle = 000 -- ";
   char res_msg[] = "raw response = 00000\r\n";
-  for (size_t i = 0; i < 80; i++)
+  for (size_t i = 0; i < 99; i++)
   {
-    pwm_cmd = i*10;
-    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pwm_cmd);
+    // PWM duty = CCR/ARR -> ARR = 100-1 so CCR = duty %
+    // + prescaler = 84-1 for 84 MHz clock
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, i); 
     osDelay(1000);
     HAL_ADC_Start(&hadc1);
     HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);

@@ -3,7 +3,7 @@ angle(°),varistor_1(ohm), varistor_2(ohm)
 resting,1090
 100,1944
 
-raw response
+raw response(12 bits dma)
 
 0, 595
 resting, 790
