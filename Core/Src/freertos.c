@@ -90,13 +90,6 @@ const osThreadAttr_t PWMResponse_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityRealtime,
 };
-/* Definitions for Scheduler */
-osThreadId_t SchedulerHandle;
-const osThreadAttr_t Scheduler_attributes = {
-  .name = "Scheduler",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
-};
 /* Definitions for ComQueue */
 osMessageQueueId_t ComQueueHandle;
 const osMessageQueueAttr_t ComQueue_attributes = {
@@ -129,7 +122,6 @@ void StartLedBlinkTask(void *argument);
 void StartButtonTask(void *argument);
 void StartStepResponse(void *argument);
 void StartPWMResponse(void *argument);
-void StartScheduler(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -188,11 +180,13 @@ void MX_FREERTOS_Init(void) {
   /* creation of PWMResponse */
   PWMResponseHandle = osThreadNew(StartPWMResponse, NULL, &PWMResponse_attributes);
 
-  /* creation of Scheduler */
-  SchedulerHandle = osThreadNew(StartScheduler, NULL, &Scheduler_attributes);
-
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
+  osThreadTerminate(LedBlinkTaskHandle);
+  osThreadTerminate(ButtonTaskHandle);
+  osThreadTerminate(StepResponseHandle);
+  osThreadTerminate(PWMResponseHandle);
+
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -212,10 +206,7 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
-  for(;;)
-  {
-    osDelay(200);
-  }
+  PWMResponseHandle = osThreadNew(StartPWMResponse, NULL, &PWMResponse_attributes);
     //HAL_UART_Transmit(&huart2, (uint8_t *)"Default Task\r\n", sizeof("Default Task\r\n")-1, HAL_MAX_DELAY);
   /* USER CODE END StartDefaultTask */
 }
@@ -320,19 +311,26 @@ void StartStepResponse(void *argument)
   uint32_t  raw_responce = 0;
   uint32_t response_array[1000];
   uint32_t time_array[1000];
-  HAL_ADC_Start_DMA(&hadc1,(uint32_t*)&raw_responce,1); 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   char cmd_msg[] = "step responce 0-20 duty-cycle\r\n";
   char res_msg[] = "raw response = 00000\r\n";
   char timestamp_msg[] = "000000";
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
   HAL_UART_Transmit(&huart2, (uint8_t *)cmd_msg, sizeof(cmd_msg)-1, HAL_MAX_DELAY);
+  HAL_ADC_Start(&hadc1);
+  HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+  raw_responce = HAL_ADC_GetValue(&hadc1);
+  HAL_ADC_Stop(&hadc1);
   sprintf(res_msg, "raw response = %05d\r\n", (int)raw_responce);
   HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 200);
   for (size_t i = 0; i < 1000; i++)
   {
     HAL_RTC_GetTime(&hrtc, &internal_time, RTC_FORMAT_BCD);
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+    raw_responce = HAL_ADC_GetValue(&hadc1);
+    HAL_ADC_Stop(&hadc1);
     response_array[i] = raw_responce;
     time_array[i] = internal_time.SecondFraction;
   }
@@ -362,7 +360,6 @@ void StartPWMResponse(void *argument)
   /* Infinite loop */
   uint16_t   pwm_cmd = 0;
   uint32_t  raw_responce = 0;
-  HAL_ADC_Start_DMA(&hadc1,(uint32_t*)&raw_responce,1); 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   char cmd_msg[] = "duty cycle = 000 -- ";
   char res_msg[] = "raw response = 00000\r\n";
@@ -371,6 +368,10 @@ void StartPWMResponse(void *argument)
     pwm_cmd = i*10;
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, pwm_cmd);
     osDelay(1000);
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+    raw_responce = HAL_ADC_GetValue(&hadc1);
+    HAL_ADC_Stop(&hadc1);
     sprintf(cmd_msg, "duty cycle = %03d -- ", i);
     sprintf(res_msg, "raw response = %05d\r\n", (int)raw_responce);
     HAL_UART_Transmit(&huart2, (uint8_t *)cmd_msg, sizeof(cmd_msg)-1, HAL_MAX_DELAY);
@@ -378,24 +379,6 @@ void StartPWMResponse(void *argument)
   }
   
   /* USER CODE END StartPWMResponse */
-}
-
-/* USER CODE BEGIN Header_StartScheduler */
-/**
-* @brief Function implementing the Scheduler thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartScheduler */
-void StartScheduler(void *argument)
-{
-  /* USER CODE BEGIN StartScheduler */
-  /* Infinite loop */
-  for(;;)
-  {
-    osDelay(1);
-  }
-  /* USER CODE END StartScheduler */
 }
 
 /* Private application code --------------------------------------------------*/
