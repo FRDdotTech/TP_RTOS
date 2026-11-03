@@ -197,14 +197,11 @@ void StartDataAquisitionTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    uint8_t testDuty = 70;
-    char start_msg[] = "step response for 000 duty cycle\r\n";
-    sprintf(start_msg, "step response for %3d duty cycle\r\n", (int)testDuty);
-    HAL_UART_Transmit(&huart2, (uint8_t *)start_msg, sizeof(start_msg)-1, HAL_MAX_DELAY);
-    step_response(testDuty);
+    uint8_t testDuty = 10;
+    pwm_response();
     osDelay(1000);
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
-    osDelay(20000);
+    osDelay(10000);
   }
   /* USER CODE END StartDataAquisitionTask */
 }
@@ -250,22 +247,19 @@ void pwm_response(void)
 {
   uint32_t  raw_responce = 0;
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  char cmd_msg[] = "duty cycle = 000 -- ";
-  char res_msg[] = "raw response = 00000\r\n";
+  char msg[] = "duty cycle, 000, raw response, 00000\r\n";
   for (size_t i = 0; i < 70; i++)
   {
     // PWM duty = CCR/ARR -> ARR = 100-1 so CCR = duty %
     // + prescaler = 84-1 for 84 MHz clock
     __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, i); 
-    osDelay(1000);
+    osDelay(250);
     HAL_ADC_Start(&hadc1);
     HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
     raw_responce = HAL_ADC_GetValue(&hadc1);
     HAL_ADC_Stop(&hadc1);
-    sprintf(cmd_msg, "duty cycle = %03d -- ", i);
-    sprintf(res_msg, "raw response = %05d\r\n", (int)raw_responce);
-    HAL_UART_Transmit(&huart2, (uint8_t *)cmd_msg, sizeof(cmd_msg)-1, HAL_MAX_DELAY);
-    HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
+    sprintf(msg, "duty cycle, %3d, raw response, %5d\r\n",(int) i, (int)raw_responce);
+    HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg)-1, HAL_MAX_DELAY);
   }
 }
 
@@ -273,11 +267,9 @@ void step_response(uint8_t duty)
 {
   uint32_t  raw_responce = 0;
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
-  char cmd_msg[] = "step responce 0-20 duty-cycle\r\n";
   char res_msg[] = " raw response, 00000\r\n";
   char timestamp_msg[] = "000000 ,";
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
-  HAL_UART_Transmit(&huart2, (uint8_t *)cmd_msg, sizeof(cmd_msg)-1, HAL_MAX_DELAY);
   HAL_ADC_Start(&hadc1);
   HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
   raw_responce = HAL_ADC_GetValue(&hadc1);
@@ -285,7 +277,7 @@ void step_response(uint8_t duty)
   sprintf(res_msg, " raw response, %05d\r\n", (int)raw_responce);
   HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
   __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty); // duty%
-  for (size_t i = 0; i < 1000; i++)
+  for (size_t i = 0; i < 501; i++)
   {
     HAL_ADC_Start(&hadc1);
     HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
@@ -294,13 +286,15 @@ void step_response(uint8_t duty)
     response_array[i] = raw_responce;
     osDelay(1); // 1ms
   }
-  for (size_t i = 0; i < 1000; i++)
+  for (size_t i = 0; i < 501; i++)
   {
     sprintf(timestamp_msg, "%06d", (int) i);
     HAL_UART_Transmit(&huart2, (uint8_t *)timestamp_msg, sizeof(timestamp_msg)-1, HAL_MAX_DELAY);
+    osDelay(1);
     sprintf(res_msg, " raw response, %05d\r\n", (int)response_array[i]);
     HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
   }
+  osDelay(1); // for breakpoint
 }
 
 /* USER CODE END Application */

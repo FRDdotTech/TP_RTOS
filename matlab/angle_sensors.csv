@@ -8,3 +8,9 @@ raw response(12 bits dma)
 0, 595
 resting, 790
 100, 1230
+
+
+006 room
+0, 1955
+resting, 2295
+100, 2850
