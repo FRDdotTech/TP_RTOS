@@ -74,9 +74,6 @@ int main(void)
   /* USER CODE BEGIN 1 */
   
   // GPIO config for the motor driver
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_4, GPIO_PIN_SET);
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -101,6 +98,7 @@ int main(void)
   MX_TIM2_Init();
   MX_ADC1_Init();
   MX_RTC_Init();
+  MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
