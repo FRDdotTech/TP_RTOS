@@ -34,6 +34,7 @@
 #include <string.h>
 #include "adc.h"
 #include "rtc.h"
+#include "gpio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,6 +54,8 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
+uint32_t response_array[1000];
+uint32_t time_array[1000];
 
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
@@ -61,20 +64,6 @@ const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for LedBlinkTask */
-osThreadId_t LedBlinkTaskHandle;
-const osThreadAttr_t LedBlinkTask_attributes = {
-  .name = "LedBlinkTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
-};
-/* Definitions for ButtonTask */
-osThreadId_t ButtonTaskHandle;
-const osThreadAttr_t ButtonTask_attributes = {
-  .name = "ButtonTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for StepResponse */
 osThreadId_t StepResponseHandle;
@@ -118,8 +107,6 @@ void LED2_SOS(void);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
-void StartLedBlinkTask(void *argument);
-void StartButtonTask(void *argument);
 void StartStepResponse(void *argument);
 void StartPWMResponse(void *argument);
 
@@ -168,12 +155,6 @@ void MX_FREERTOS_Init(void) {
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
-  /* creation of LedBlinkTask */
-  LedBlinkTaskHandle = osThreadNew(StartLedBlinkTask, NULL, &LedBlinkTask_attributes);
-
-  /* creation of ButtonTask */
-  ButtonTaskHandle = osThreadNew(StartButtonTask, NULL, &ButtonTask_attributes);
-
   /* creation of StepResponse */
   StepResponseHandle = osThreadNew(StartStepResponse, NULL, &StepResponse_attributes);
 
@@ -182,10 +163,6 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
-  osThreadTerminate(LedBlinkTaskHandle);
-  osThreadTerminate(ButtonTaskHandle);
-  osThreadTerminate(StepResponseHandle);
-  osThreadTerminate(PWMResponseHandle);
 
   /* USER CODE END RTOS_THREADS */
 
@@ -206,92 +183,12 @@ void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN StartDefaultTask */
   /* Infinite loop */
-  PWMResponseHandle = osThreadNew(StartPWMResponse, NULL, &PWMResponse_attributes);
-  /* USER CODE END StartDefaultTask */
-}
-
-/* USER CODE BEGIN Header_StartLedBlinkTask */
-/**
-* @brief Function implementing the LedBlinkTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartLedBlinkTask */
-void StartLedBlinkTask(void *argument)
-{
-  /* USER CODE BEGIN StartLedBlinkTask */
-  /* Infinite loop */
-  bool blinkRate = true; // Default blink rate
-  uint8_t queuemsg;
-  for(;;)
-  {   
-    osMessageQueueGet(ComQueueHandle, &queuemsg, 0, 100);
-    if (queuemsg == 0xFF) 
-    {
-      while(osMutexAcquire(UARTMutexHandle, osWaitForever) != osOK);
-      HAL_UART_Transmit(&huart2, (uint8_t *)"MSG received\r\n", sizeof("MSG received\r\n")-1, HAL_MAX_DELAY);
-      osMutexRelease(UARTMutexHandle);
-      blinkRate = !blinkRate; // Change blink rate to fast when SOS is received
-      queuemsg = 0; // Reset the message after processing
-    }
-
-    if (blinkRate) {
-      LED2_Blink(1000); // Slow blink
-    } else {
-      LED2_Blink(200); // Fast blink
-    }
-    
-    //LED2_SOS();
-  }
-  /* USER CODE END StartLedBlinkTask */
-}
-
-/* USER CODE BEGIN Header_StartButtonTask */
-/**
-* @brief Function implementing the ButtonTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartButtonTask */
-void StartButtonTask(void *argument)
-{
-  /* USER CODE BEGIN StartButtonTask */
-  /* Infinite loop */
-  GPIO_PinState buttonState;
-  for(;;)
+  for (;;)
   {
-    
-    uint8_t DebounceCounter = 0;
-    
-    while(DebounceCounter < 5) {
-      while(osMutexAcquire(ButtonMutexHandle, osWaitForever) != osOK);
-      buttonState = HAL_GPIO_ReadPin(USER_BUTTON_GPIO_PORT, USER_BUTTON_PIN);
-      osMutexRelease(ButtonMutexHandle);
-      
-      if(buttonState == GPIO_PIN_RESET) {
-        DebounceCounter++;
-      } else {
-        DebounceCounter = 0;
-      }
-      osDelay(10); // Debounce delay
-    }
-
-    // Button is pressed
-    // osMutexAcquire(UARTMutexHandle, osWaitForever);
-    // HAL_UART_Transmit(&huart2, (uint8_t *)"SOS\r\n", sizeof("SOS\r\n")-1, HAL_MAX_DELAY);
-    // osMutexRelease(UARTMutexHandle);
-    uint8_t message = 0xFF;
-    osMessageQueuePut(ComQueueHandle, &message, 0, osWaitForever);
-    osDelay(100);
-
-    while(buttonState == GPIO_PIN_RESET) {
-      while(osMutexAcquire(ButtonMutexHandle, osWaitForever) != osOK);
-      buttonState = HAL_GPIO_ReadPin(USER_BUTTON_GPIO_PORT, USER_BUTTON_PIN);
-      osMutexRelease(ButtonMutexHandle);
-      osDelay(10); // Debounce delay
-    }
+    osDelay(1);
   }
-  /* USER CODE END StartButtonTask */
+  
+  /* USER CODE END StartDefaultTask */
 }
 
 /* USER CODE BEGIN Header_StartStepResponse */
@@ -308,8 +205,6 @@ void StartStepResponse(void *argument)
 
   RTC_TimeTypeDef internal_time;
   uint32_t  raw_responce = 0;
-  uint32_t response_array[1000];
-  uint32_t time_array[1000];
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   char cmd_msg[] = "step responce 0-20 duty-cycle\r\n";
   char res_msg[] = " raw response, 00000\r\n";
@@ -322,7 +217,7 @@ void StartStepResponse(void *argument)
   HAL_ADC_Stop(&hadc1);
   sprintf(res_msg, " raw response, %05d\r\n", (int)raw_responce);
   HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
-  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 20); // 20%
+  __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 50); // duty%
   for (size_t i = 0; i < 1000; i++)
   {
     HAL_RTC_GetTime(&hrtc, &internal_time, RTC_FORMAT_BCD);
@@ -340,9 +235,6 @@ void StartStepResponse(void *argument)
     sprintf(res_msg, " raw response, %05d\r\n", (int)response_array[i]);
     HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
   }
-  
-  
-  
   /* USER CODE END StartStepResponse */
 }
 
@@ -357,6 +249,7 @@ void StartPWMResponse(void *argument)
 {
   /* USER CODE BEGIN StartPWMResponse */
   /* Infinite loop */
+
   uint32_t  raw_responce = 0;
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   char cmd_msg[] = "duty cycle = 000 -- ";
@@ -376,6 +269,7 @@ void StartPWMResponse(void *argument)
     HAL_UART_Transmit(&huart2, (uint8_t *)cmd_msg, sizeof(cmd_msg)-1, HAL_MAX_DELAY);
     HAL_UART_Transmit(&huart2, (uint8_t *)res_msg, sizeof(res_msg)-1, HAL_MAX_DELAY);
   }
+  osThreadTerminate(PWMResponseHandle);
   
   /* USER CODE END StartPWMResponse */
 }
