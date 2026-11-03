@@ -68,7 +68,7 @@ for k = 1:nTests
         continue;
     end
 
-    % Lecture du format : entier, texte, entier
+    % Lecture du format : temps_ms, texte, ADC
     fid = fopen(filename, 'r');
     C = textscan(fid, '%d %s %d', 'Delimiter', ',');
     fclose(fid);
@@ -79,10 +79,11 @@ for k = 1:nTests
     % Conversion en secondes
     t = t_ms / 1000;
 
-    % Nettoyage basique
+    % Suppression des doublons de temps, en conservant l'ordre
     [t, ia] = unique(t, 'stable');
     adc = adc(ia);
 
+    % Suppression des valeurs invalides
     valid = isfinite(t) & isfinite(adc);
     t = t(valid);
     adc = adc(valid);
@@ -92,27 +93,29 @@ for k = 1:nTests
         continue;
     end
 
-    % Vérification de la durée
-    if abs((numel(t)*Ts) - T_record) > 5*Ts
+    % Vérification de la durée réelle
+    duration_ms = (t(end) - t(1)) * 1000;
+    expected_duration_ms = (N_expected - 1) * Ts * 1000;
+
+    if abs(duration_ms - expected_duration_ms) > 10
         warning(...
-            'Durée inattendue dans %s : %d points, %.1f ms', ...
-            filename, numel(t), (numel(t)-1)*1000);
+            'Durée inattendue dans %s : %.1f ms au lieu de %.1f ms', ...
+            filename, duration_ms, expected_duration_ms);
     end
 
     % Entrée : échelon de duty cycle
-    % Duty normalisé entre 0 et 1
     u = d_final/100 * ones(size(t));
 
-    % Sortie : angle équivalent en degrés
+    % Sortie : angle équivalent
     position = (adc - ADC_0) / (ADC_100 - ADC_0);
     y = position * 90;
 
-    % Stockage pour identification
+    % Stockage
     all_u{end+1} = u; %#ok<SAGROW>
     all_y{end+1} = y; %#ok<SAGROW>
 
-    % Valeurs initiales et finales
-    n_avg = 20;  % moyenne sur les 20 premiers et derniers ms
+    % Moyennage initial et final
+    n_avg = 20;
     ADC_init  = mean(adc(1:n_avg));
     ADC_final = mean(adc(end-n_avg+1:end));
 
